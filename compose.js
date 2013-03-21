@@ -51,7 +51,7 @@ define([], function(){
 								value = existing;
 							}else if(!isInMethodChain(existing, key, getBases([arg], true))){
 								// the existing method is not in the current override chain, so we are left with a conflict
-								console.error("Conflicted method " + key + ", final composer must explicitly override with correct method.");
+								throw new Error("Conflicted method " + key + ", final composer must explicitly override with correct method.");
 							}
 						}
 					}
