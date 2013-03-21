@@ -179,32 +179,47 @@ define([], function(){
 	Compose.required = required;
 	// get the value of |this| for direct function calls for this mode (strict in ES5)
 
-	function extend(){
+	function extend(name){
 		var args = [this];
 		args.push.apply(args, arguments);
+		if(typeof name === "string"){
+			args.unshift(name);
+			args.splice(2, 1);
+		}
 		return Compose.apply(0, args);
 	}
 	// Compose a constructor
 	function Compose(base){
 		var args = arguments;
-		var prototype = (args.length < 2 && typeof args[0] != "function") ?
-			args[0] : // if there is just a single argument object, just use that as the prototype
-			mixin(delegate(validArg(base)), args, 1); // normally create a delegate to start with
-		function Constructor(){
-			var instance;
-			if(this instanceof Constructor){
-				// called with new operator, can proceed as is
-				instance = this;
-			}else{
-				// we allow for direct calls without a new operator, in this case we need to
-				// create the instance ourself.
-				Create.prototype = prototype;
-				instance = new Create();
+		var baseArg = 0;
+		var name = "ComposedConstructor";
+		if(typeof base === "string"){
+			name = base;
+			baseArg = 1;
+			base = args[1];
+		}
+		if(Compose.debuggableName){
+			name = Compose.debuggableName(name) || name;
+		}
+		if(name === "_"){
+			// The only name we reserve is '_', calling code should ensure not to use reserved keywords
+			name = "ComposedConstructor";
+		}
+		var prototype = (args.length < baseArg + 2 && typeof args[baseArg] != "function") ?
+			base : // if there is just a single argument object, just use that as the prototype
+			mixin(delegate(validArg(base)), args, baseArg + 1); // normally create a delegate to start with
+		var Constructor;
+		var instantiate = function(instance, args){
+			if(!(instance instanceof Constructor)){
+				instance = new Constructor(instantiate);
+			}
+			if(args[0] === instantiate){
+				return instance;
 			}
 			// call all the constructors with the given arguments
 			for(var i = 0; i < constructorsLength; i++){
 				var constructor = constructors[i];
-				var result = constructor.apply(instance, arguments);
+				var result = constructor.apply(instance, args);
 				if(typeof result == "object"){
 					if(result instanceof Constructor){
 						instance = result;
@@ -218,7 +233,8 @@ define([], function(){
 				}
 			}
 			return instance;
-		}
+		};
+		Constructor = new Function("_", "return function " + name + "(){ return _(this, arguments); }")(instantiate);
 		// create a function that can retrieve the bases (constructors or prototypes)
 		Constructor._getBases = function(prototype){
 			return prototype ? prototypes : constructors;
