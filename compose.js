@@ -26,19 +26,21 @@ define([], function(){
 		return arg;
 	}
 	// this does the work of combining mixins/prototypes
-	function mixin(instance, args, i){
+	var mixin = function(instance, args, i){
 		// use prototype inheritance for first arg
 		var value, argsLength = args.length;
+		var key;
 		for(; i < argsLength; i++){
 			var arg = args[i];
 			if(typeof arg == "function"){
 				// the arg is a function, use the prototype for the properties
 				var prototype = arg.prototype;
-				for(var key in prototype){
+				var existing;
+				for(key in prototype){
 					value = prototype[key];
 					var own = prototype.hasOwnProperty(key);
 					if(typeof value == "function" && key in instance && value !== instance[key]){
-						var existing = instance[key];
+						existing = instance[key];
 						if(value == required){
 							// it is a required value, and we have satisfied it
 							value = existing;
@@ -64,8 +66,8 @@ define([], function(){
 				}
 			}else{
 				// it is an object, copy properties, looking for modifiers
-				for(var key in validArg(arg)){
-					var value = arg[key];
+				for(key in validArg(arg)){
+					value = arg[key];
 					if(typeof value == "function"){
 						if(value.install){
 							// apply modifier
@@ -85,7 +87,7 @@ define([], function(){
 			}
 		}
 		return instance;
-	}
+	};
 	// allow for override (by es5 module)
 	Compose._setMixin = function(newMixin){
 		mixin = newMixin;
@@ -101,7 +103,7 @@ define([], function(){
 		}
 	}
 	// Decorator branding
-	function Decorator(install, direct){
+	function createDecorator(install, direct){
 		function Decorator(){
 			if(direct){
 				return direct.apply(this, arguments);
@@ -111,16 +113,16 @@ define([], function(){
 		Decorator.install = install;
 		return Decorator;
 	}
-	Compose.Decorator = Decorator;
+	Compose.Decorator = createDecorator;
 	// aspect applier
 	function aspect(handler){
 		return function(advice){
-			return Decorator(function install(key){
+			return createDecorator(function install(key){
 				var baseMethod = this[key];
 				(advice = this[key] = baseMethod ? handler(this, baseMethod, advice) : advice).install = install;
 			}, advice);
 		};
-	};
+	}
 	// around advice, useful for calling super methods too
 	Compose.around = aspect(function(target, base, advice){
 		return advice.call(target, base);
@@ -134,12 +136,12 @@ define([], function(){
 		};
 	});
 	var stop = Compose.stop = {};
-	var undefined;
+	var undef;
 	Compose.after = aspect(function(target, base, advice){
 		return function(){
 			var results = base.apply(this, arguments);
 			var adviceResults = advice.apply(this, arguments);
-			return adviceResults === undefined ? results : adviceResults;
+			return adviceResults === undef ? results : adviceResults;
 		};
 	});
 
@@ -148,7 +150,7 @@ define([], function(){
 		if(fromKey){
 			return (typeof trait == "function" ? trait.prototype : trait)[fromKey];
 		}
-		return Decorator(function(key){
+		return createDecorator(function(key){
 			if(!(this[key] = (typeof trait == "string" ? this[trait] :
 				(typeof trait == "function" ? trait.prototype : trait)[fromKey || key]))){
 				throw new Error("Source method " + fromKey + " was not available to be renamed to " + key);
@@ -169,11 +171,11 @@ define([], function(){
 			}
 		}
 		return instance;
-	}
+	};
 	// The required function, just throws an error if not overriden
 	function required(){
 		throw new Error("This method is required and no implementation has been provided");
-	};
+	}
 	Compose.required = required;
 	// get the value of |this| for direct function calls for this mode (strict in ES5)
 
@@ -234,7 +236,7 @@ define([], function(){
 		}
 		Constructor.prototype = prototype;
 		return Constructor;
-	};
+	}
 
 	Compose.apply = function(thisObject, args){
 		// apply to the target
